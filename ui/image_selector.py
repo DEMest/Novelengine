@@ -1,6 +1,5 @@
 import os
-from PyQt5.QtWidgets import QWidget, QPushButton, QVBoxLayout, QListWidget, QHBoxLayout, QSplitter, QSlider, \
-    QGraphicsView, QGraphicsScene
+from PyQt5.QtWidgets import QWidget, QPushButton, QVBoxLayout, QListWidget, QHBoxLayout, QSplitter, QSlider, QGraphicsView, QGraphicsScene
 from PyQt5.QtGui import QColor, QPalette, QIcon, QPixmap, QDrag
 from PyQt5.QtCore import Qt, QUrl, QMimeData, QPoint
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
@@ -8,7 +7,6 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 from config.config_manager import save_config
 from utils.image_processor import display_image, clear_image
 from PyQt5.QtGui import QPainter
-
 
 class ImageSelector(QWidget):
     def __init__(self):
@@ -268,6 +266,7 @@ class ImageSelector(QWidget):
             pixmap = QPixmap(self.selected_image_path)
             self.preview_scene.clear()
             self.preview_scene.addPixmap(pixmap)
+            self.preview_view.fitInView(self.preview_scene.itemsBoundingRect(), Qt.KeepAspectRatio)
         elif selected_path.lower().endswith(('.wav', '.mp3', '.aac', '.flac')):
             audio_path = os.path.join(os.getcwd(), 'assets', 'sound')
             audio_file_path = os.path.join(audio_path, selected_path)
@@ -318,21 +317,27 @@ class ImageSelector(QWidget):
             factor = 0.9
         else:
             return
-        self.preview_view.scale(factor, factor)
         self.preview_view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.preview_view.scale(factor, factor)
+        self.preview_view.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Shift:
-            self.preview_view.horizontalScrollBar().setEnabled(True)
-        elif event.key() == Qt.Key_Control:
-            self.preview_view.verticalScrollBar().setEnabled(True)
-        elif event.key() == Qt.Key_Alt:
-            pass
+        if event.modifiers() == Qt.ShiftModifier:
+            if event.key() == Qt.Key_Left:
+                self.preview_view.horizontalScrollBar().setValue(self.preview_view.horizontalScrollBar().value() - 20)
+            elif event.key() == Qt.Key_Right:
+                self.preview_view.horizontalScrollBar().setValue(self.preview_view.horizontalScrollBar().value() + 20)
+        elif event.modifiers() == Qt.ControlModifier:
+            if event.key() == Qt.Key_Up:
+                self.preview_view.verticalScrollBar().setValue(self.preview_view.verticalScrollBar().value() - 20)
+            elif event.key() == Qt.Key_Down:
+                self.preview_view.verticalScrollBar().setValue(self.preview_view.verticalScrollBar().value() + 20)
+        elif event.modifiers() == Qt.AltModifier:
+            if event.key() == Qt.Key_Equal:
+                self.preview_view.scale(1.1, 1.1)
+            elif event.key() == Qt.Key_Minus:
+                self.preview_view.scale(0.9, 0.9)
 
     def keyReleaseEvent(self, event):
-        if event.key() == Qt.Key_Shift:
-            self.preview_view.horizontalScrollBar().setEnabled(False)
-        elif event.key() == Qt.Key_Control:
-            self.preview_view.verticalScrollBar().setEnabled(False)
-        elif event.key() == Qt.Key_Alt:
-            pass
+        if event.key() == Qt.Key_Alt:
+            self.preview_view.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
