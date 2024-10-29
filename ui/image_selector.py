@@ -1,11 +1,10 @@
 import os
-from PyQt5.QtWidgets import QWidget, QPushButton, QVBoxLayout, QListWidget, QHBoxLayout, QSplitter, QSlider, QGraphicsView, QGraphicsScene
+from PyQt5.QtWidgets import QWidget, QPushButton, QVBoxLayout, QListWidget, QHBoxLayout, QSplitter, QSlider, QGraphicsView, QGraphicsScene, QMenuBar, QAction, QTextEdit
 from PyQt5.QtGui import QColor, QPalette, QIcon, QPixmap, QDrag
-from PyQt5.QtCore import Qt, QUrl, QMimeData, QPoint
+from PyQt5.QtCore import Qt, QUrl, QMimeData
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtMultimediaWidgets import QVideoWidget
 from config.config_manager import save_config
-from utils.image_processor import display_image, clear_image
+from ui.story_node import StoryScene
 from PyQt5.QtGui import QPainter
 
 class ImageSelector(QWidget):
@@ -37,7 +36,6 @@ class ImageSelector(QWidget):
         main_layout = QHBoxLayout(self)
         splitter = QSplitter(Qt.Horizontal)
 
-        # Панель выбора изображений, аудио и видео
         self.toolbox_layout = QVBoxLayout()
         self.select_button = QPushButton('Изображения', self)
         self.select_button.setStyleSheet(
@@ -110,9 +108,9 @@ class ImageSelector(QWidget):
             "    padding: 5px;"
             "}"
             "QScrollBar:vertical, QScrollBar:horizontal {"
-            "    background: #333333;"
-            "    width: 8px;"
-            "    height: 8px;"
+            "    background: #2a2a2a;"  # Меняем на цвет фона списка
+            "    width: 10px;"
+            "    height: 10px;"
             "}"
             "QScrollBar::handle:vertical, QScrollBar::handle:horizontal {"
             "    background: #4a4a4a;"
@@ -123,11 +121,15 @@ class ImageSelector(QWidget):
             "    background: #5a5a5a;"
             "}"
             "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical, QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {"
+            "    background: none;"
             "    height: 0px;"
             "    width: 0px;"
             "}"
+            "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical, QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {"
+            "    background: none;"
+            "}"
             "QScrollBar::groove:horizontal, QScrollBar::groove:vertical {"
-            "    background: #333333;"
+            "    background: #2a2a2a;"
             "    border: none;"
             "}"
         )
@@ -137,7 +139,6 @@ class ImageSelector(QWidget):
         toolbox_widget = QWidget()
         toolbox_widget.setLayout(self.toolbox_layout)
 
-        # Окно предпросмотра изображений, аудио и видео
         self.preview_view = QGraphicsView()
         self.preview_scene = QGraphicsScene()
         self.preview_view.setScene(self.preview_scene)
@@ -148,7 +149,6 @@ class ImageSelector(QWidget):
         self.preview_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.preview_view.scale(0.8, 0.8)
 
-        # Область для работы с холстом
         self.canvas_view = QGraphicsView()
         self.canvas_scene = QGraphicsScene()
         self.canvas_view.setScene(self.canvas_scene)
@@ -158,6 +158,15 @@ class ImageSelector(QWidget):
         self.canvas_view.setAcceptDrops(True)
         self.canvas_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.canvas_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        self.story_view = QGraphicsView()
+        self.story_scene = StoryScene()
+        self.story_view.setScene(self.story_scene)
+        self.story_view.setStyleSheet("background-color: #1a1a1a;")
+        self.story_view.setRenderHint(QPainter.Antialiasing, True)
+        self.story_view.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        self.story_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.story_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         splitter.addWidget(toolbox_widget)
         splitter.addWidget(self.image_list)
@@ -170,16 +179,36 @@ class ImageSelector(QWidget):
         right_splitter.setChildrenCollapsible(False)
 
         splitter.addWidget(right_splitter)
+        splitter.addWidget(self.story_view)
+        splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 4)
+        splitter.setStretchFactor(2, 2)
         splitter.setChildrenCollapsible(False)
+        splitter.setSizes([500, 1000, 500])
 
         main_layout.addWidget(splitter)
         self.setLayout(main_layout)
 
+        self.menu_bar = QMenuBar(self)
+        file_menu = self.menu_bar.addMenu('File')
+        save_action = QAction('Save Project', self)
+        save_action.triggered.connect(self.save_project)
+        load_action = QAction('Load Project', self)
+        load_action.triggered.connect(self.load_project)
+        file_menu.addAction(save_action)
+        file_menu.addAction(load_action)
+
+        edit_menu = self.menu_bar.addMenu('Edit')
+        undo_action = QAction('Undo', self)
+        redo_action = QAction('Redo', self)
+        edit_menu.addAction(undo_action)
+        edit_menu.addAction(redo_action)
+
+        main_layout.setMenuBar(self.menu_bar)
+
         self.media_player.positionChanged.connect(self.position_changed)
         self.media_player.durationChanged.connect(self.duration_changed)
 
-        # Кнопки воспроизведения и остановки аудио
         self.play_button = QPushButton('Воспроизвести', self)
         self.play_button.setStyleSheet(
             "QPushButton {"
@@ -233,6 +262,29 @@ class ImageSelector(QWidget):
         )
         self.position_slider.sliderMoved.connect(self.set_position)
         self.toolbox_layout.addWidget(self.position_slider)
+
+        self.dialog_text = QTextEdit(self)
+        self.dialog_text.setStyleSheet("background-color: #2a2a2a; color: white; padding: 10px; border-radius: 5px;")
+        self.toolbox_layout.addWidget(self.dialog_text)
+
+        add_node_button = QPushButton('Добавить узел', self)
+        add_node_button.setStyleSheet(
+            "QPushButton {"
+            "    background-color: #2a2a2a;"
+            "    color: white;"
+            "    font-weight: bold;"
+            "    padding: 10px;"
+            "    border-radius: 5px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: #3a3a3a;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: #1a1a1a;"
+            "}"
+        )
+        add_node_button.clicked.connect(self.add_story_node)
+        self.toolbox_layout.addWidget(add_node_button)
 
     def show_images(self):
         images_path = os.path.join(os.getcwd(), 'assets', 'images')
@@ -311,15 +363,26 @@ class ImageSelector(QWidget):
         self.position_slider.setRange(0, duration)
 
     def wheelEvent(self, event):
-        if event.angleDelta().y() > 0:
-            factor = 1.1
-        elif event.angleDelta().y() < 0:
-            factor = 0.9
-        else:
-            return
-        self.preview_view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
-        self.preview_view.scale(factor, factor)
-        self.preview_view.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+        if self.preview_view.hasFocus():
+            if event.angleDelta().y() > 0:
+                factor = 1.1
+            elif event.angleDelta().y() < 0:
+                factor = 0.9
+            else:
+                return
+            self.preview_view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+            self.preview_view.scale(factor, factor)
+            self.preview_view.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+        elif self.story_view.hasFocus():
+            if event.angleDelta().y() > 0:
+                factor = 1.1
+            elif event.angleDelta().y() < 0:
+                factor = 0.9
+            else:
+                return
+            self.story_view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+            self.story_view.scale(factor, factor)
+            self.story_view.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.ShiftModifier:
@@ -341,3 +404,20 @@ class ImageSelector(QWidget):
     def keyReleaseEvent(self, event):
         if event.key() == Qt.Key_Alt:
             self.preview_view.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+
+    def save_project(self):
+        save_config('project_state')
+
+    def load_project(self):
+        pass
+
+    def add_story_node(self):
+        text = self.dialog_text.toPlainText()
+        if text:
+            node_name = text.split('\n', 1)[0]
+            file_path = os.path.join('assets', 'text', f"{node_name}.txt")
+            with open(file_path, 'w', encoding='utf-8') as file:
+                file.write(text)
+            current_nodes = len(self.story_scene.items())
+            offset = 100 * current_nodes
+            self.story_scene.add_story_node(offset, offset, text=node_name)
