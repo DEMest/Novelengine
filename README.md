@@ -4,7 +4,7 @@ just a project to optimize work for novel and study
 To develop after getting the code you should make project
 with any IDE, then complete next steps:
 
-    1. Make sure, you have python compiler installed
+    1. Make sure, you have python ccompiler installed
     on your PC
 
     2. Setup configuration on Pytnon Interpreter point it
